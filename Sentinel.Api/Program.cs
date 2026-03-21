@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using Sentinel.Application;
 using Sentinel.Application.Abstractions;
 using Sentinel.Application.Parsers;
 using Sentinel.Application.Services;
+using Sentinel.Infrastructure;
 using Sentinel.Infrastructure.Persistence.Context;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -23,8 +25,8 @@ builder.Services.AddOpenApi();
 builder.Services.AddDbContext<SentinelDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-builder.Services.AddScoped<IParserStrategy, NuGetParserStrategy>();
-builder.Services.AddScoped<IScannerService, ScannerService>();
+builder.Services.AddInfrastructureServices(builder.Configuration);
+builder.Services.AddApplicationServices();
 
 var app = builder.Build();
 
