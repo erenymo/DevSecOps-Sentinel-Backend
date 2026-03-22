@@ -13,9 +13,9 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.AllowAnyOrigin()   // Tüm kaynaklara izin ver (Geliþtirme aþamasý için)
-              .AllowAnyMethod()   // GET, POST, PUT vb. hepsine izin ver
-              .AllowAnyHeader();  // Tüm Header'lara izin ver
+        policy.AllowAnyOrigin()   
+              .AllowAnyMethod()   
+              .AllowAnyHeader(); 
     });
 });
 

@@ -16,14 +16,13 @@ namespace Sentinel.Application
             // 1. AutoMapper Kaydı
             services.AddAutoMapper(Assembly.GetExecutingAssembly());
 
-            // 2. Scrutor ile Akıllı Tarama (Smart Registration)
             services.Scan(selector => selector
-                .FromAssemblies(typeof(DependencyInjection).Assembly) // Mevcut assembly'i (Application) tara
+                .FromAssemblies(typeof(DependencyInjection).Assembly) 
                 .AddClasses(classes => classes.Where(type =>
                     type.Name.EndsWith("Service") ||
-                    type.Name.EndsWith("Strategy"))) // Hem Servisleri hem Stratejileri bul
-                .AsImplementedInterfaces() // IScannerService, IParserStrategy gibi arayüzlerle eşleştir
-                .WithScopedLifetime()); // İstek bazlı (Scoped) ömür biç
+                    type.Name.EndsWith("Strategy")))
+                .AsImplementedInterfaces()
+                .WithScopedLifetime()); 
 
             return services;
         }

@@ -17,7 +17,9 @@ namespace Sentinel.Domain.Entities
         public string Name { get; set; } = string.Empty;
         public string Version { get; set; } = string.Empty;
         public string? Purl { get; set; }
-        public bool IsTransitive { get; set; } 
+        public bool IsTransitive { get; set; }
+        public string? ParentName { get; set; }
+        public string? DependencyPath { get; set; }
 
         public virtual ICollection<VexStatement> VexStatements { get; set; } = new List<VexStatement>();
     }
