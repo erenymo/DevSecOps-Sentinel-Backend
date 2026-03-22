@@ -1,0 +1,11 @@
+﻿{
+    "data":  {
+                 "token":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMTlkMTRmYi1iNWNmLTc0MDAtYjFiYi1lMWJkZjI1N2EzM2YiLCJlbWFpbCI6InRlc3QxMEBzZW50aW5lbC5jb20iLCJuYW1lIjoiVGVzdFNlbnRpbmVsIiwianRpIjoiMjY0M2FkZmQtMzBlYS00YTIwLTljZDUtNjg0OGUzODY0MjAwIiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy9yb2xlIjoiVXNlciIsImV4cCI6MTc3NDE3NzEzOCwiaXNzIjoiU2VudGluZWwuQmFja2VuZCIsImF1ZCI6IlNlbnRpbmVsLkNsaWVudHMifQ.x_AxvBDRE3WSgf97PPB7sgoVw_smi4kFFDxadlYxT-k",
+                 "refreshToken":  "uDICrdY8vL7mqDTYh1GqswTTT8J9eKXd6ma7wf9+5NM=",
+                 "expiration":  "2026-03-29T09:58:58.2895815Z"
+             },
+    "success":  true,
+    "message":  "Login successful.",
+    "errors":  null,
+    "timestamp":  "2026-03-22T09:58:58.292673Z"
+}
