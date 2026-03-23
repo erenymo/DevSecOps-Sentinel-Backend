@@ -21,6 +21,7 @@ namespace Sentinel.Application.Services
         {
             try
             {
+                // 1. En güncel taramayı bul (Daha önce olduğu gibi)
                 var scans = await _unitOfWork.Scans.GetAllAsync(s => s.ModuleId == moduleId);
                 var latestScan = scans.OrderByDescending(s => s.ScanDate).FirstOrDefault();
 
@@ -29,11 +30,15 @@ namespace Sentinel.Application.Services
                     return BaseResponse<IEnumerable<ComponentDto>>.Ok(new List<ComponentDto>(), "Bu modül için henüz tarama yapılmamış.");
                 }
 
-                var components = await _unitOfWork.Components.GetAllAsync(c => c.ScanId == latestScan.Id);
-                
-                var licenses = await _unitOfWork.Licenses.GetAllAsync();
-                var licenseDict = licenses.ToDictionary(l => l.Id, l => l.Name);
+                // 2. Bileşenleri ilişkileriyle (ComponentLicenses -> License) birlikte çek
+                // Not: UnitOfWork içinde Include desteği olduğunu varsayıyorum. 
+                // Yoksa repository'ni bu ilişkileri içerecek (Eager Loading) şekilde güncellemelisin.
+                var components = await _unitOfWork.Components.GetAllAsync(
+                    c => c.ScanId == latestScan.Id,
+                    includeProperties: "ComponentLicenses.License" // İlişkili veriyi dahil ediyoruz
+                );
 
+                // 3. Yeni ComponentDto yapısına göre (Many-to-Many uyumlu) haritalama yap
                 var dtos = components.Select(c => new ComponentDto(
                     c.Id,
                     c.Name,
@@ -42,7 +47,10 @@ namespace Sentinel.Application.Services
                     c.IsTransitive,
                     c.ParentName,
                     c.DependencyPath,
-                    c.LicenseId.HasValue && licenseDict.ContainsKey(c.LicenseId.Value) ? licenseDict[c.LicenseId.Value] : c.License?.Name
+                    // Birden fazla lisans ismini liste olarak alıyoruz
+                    c.ComponentLicenses != null && c.ComponentLicenses.Any()
+                        ? c.ComponentLicenses.Select(cl => cl.License.Name).ToList()
+                        : new List<string> { "Unknown" }
                 ));
 
                 return BaseResponse<IEnumerable<ComponentDto>>.Ok(dtos.ToList(), "Bileşenler başarıyla getirildi.");

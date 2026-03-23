@@ -11,9 +11,6 @@ namespace Sentinel.Domain.Entities
         public Guid ScanId { get; set; }
         public virtual Scan Scan { get; set; } = null!;
 
-        public Guid? LicenseId { get; set; }
-        public virtual License? License { get; set; }
-
         public string Name { get; set; } = string.Empty;
         public string Version { get; set; } = string.Empty;
         public string? Purl { get; set; }
@@ -22,5 +19,6 @@ namespace Sentinel.Domain.Entities
         public string? DependencyPath { get; set; }
 
         public virtual ICollection<VexStatement> VexStatements { get; set; } = new List<VexStatement>();
+        public virtual ICollection<ComponentLicense> ComponentLicenses { get; set; } = new List<ComponentLicense>();
     }
 }

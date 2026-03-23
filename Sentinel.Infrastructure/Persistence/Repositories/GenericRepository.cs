@@ -26,7 +26,24 @@ namespace Sentinel.Infrastructure.Persistence.Repositories
 
         public async Task<IEnumerable<T>> GetAllAsync() => await _dbSet.ToListAsync();
 
-        public async Task<IEnumerable<T>> GetAllAsync(Expression<Func<T, bool>> predicate) => await _dbSet.Where(predicate).ToListAsync();
+        public async Task<IEnumerable<T>> GetAllAsync(Expression<Func<T, bool>> predicate, string? includeProperties = null) 
+        {
+            IQueryable<T> query = _dbSet;
+
+            // Filtreyi uygula
+            query = query.Where(predicate);
+
+            // Ýliþkili tablolarý (Include) ekle
+            if (!string.IsNullOrEmpty(includeProperties))
+            {
+                foreach (var includeProperty in includeProperties.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    query = query.Include(includeProperty);
+                }
+            }
+
+            return await query.ToListAsync();
+        }
 
         public IQueryable<T> Where(Expression<Func<T, bool>> predicate) => _dbSet.Where(predicate);
 

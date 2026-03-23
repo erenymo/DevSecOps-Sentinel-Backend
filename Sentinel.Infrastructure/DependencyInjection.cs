@@ -6,14 +6,19 @@ using Sentinel.Application.Abstractions.Validation;
 using Sentinel.Domain.Entities;
 using Sentinel.Infrastructure.Persistence.Context;
 using Sentinel.Infrastructure.Security;
+using Sentinel.Infrastructure.DepsDev;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Sentinel.Infrastructure.Persistence.Repositories;
 using Sentinel.Infrastructure.Persistence.UnitOfWork;
+using Polly;
+using Polly.Extensions.Http;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -34,8 +39,8 @@ namespace Sentinel.Infrastructure
             services.Scan(selector => selector
                 .FromAssemblies(typeof(DependencyInjection).Assembly)
 
-                // Services
-                .AddClasses(c => c.Where(t => t.Name.EndsWith("Service")))
+                // Services (BackgroundService alt sınıflarını hariç tut — onlar AddHostedService ile Singleton kaydedilir)
+                .AddClasses(c => c.Where(t => t.Name.EndsWith("Service") && !t.IsSubclassOf(typeof(Microsoft.Extensions.Hosting.BackgroundService))))
                 .AsImplementedInterfaces()
                 .WithScopedLifetime()
 
@@ -86,7 +91,55 @@ namespace Sentinel.Infrastructure
                 };
             });
 
+            // ─── deps.dev Entegrasyonu ───────────────────────────────────────
+
+            // In-Memory Cache (lisans sonuçları için)
+            services.AddMemoryCache();
+
+            // License Enrichment Queue (Singleton — tüm scope'lar aynı kuyruğu paylaşır)
+            services.AddSingleton<ILicenseEnrichmentQueue, LicenseEnrichmentQueue>();
+
+            // DepsDevClient — HttpClientFactory ile Polly (Retry + Circuit Breaker)
+            services.AddHttpClient<IDepsDevClient, DepsDevClient>(client =>
+            {
+                client.BaseAddress = new Uri("https://api.deps.dev/");
+                client.DefaultRequestHeaders.Add("Accept", "application/json");
+                client.Timeout = TimeSpan.FromSeconds(30);
+            })
+            .AddPolicyHandler(GetRetryPolicy())
+            .AddPolicyHandler(GetCircuitBreakerPolicy());
+
+            // Arka plan lisans zenginleştirme servisi
+            services.AddHostedService<LicenseEnrichmentBackgroundService>();
+
             return services;
+        }
+
+        /// <summary>
+        /// Retry Policy: HTTP 429 (Too Many Requests) ve 5xx hataları için
+        /// exponential backoff ile 3 kez tekrar dene (2s, 4s, 8s).
+        /// </summary>
+        private static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy()
+        {
+            return HttpPolicyExtensions
+                .HandleTransientHttpError()
+                .OrResult(msg => msg.StatusCode == HttpStatusCode.TooManyRequests)
+                .WaitAndRetryAsync(
+                    retryCount: 3,
+                    sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
+        }
+
+        /// <summary>
+        /// Circuit Breaker: Art arda 5 hata olursa 30 saniye devre dışı bırak.
+        /// </summary>
+        private static IAsyncPolicy<HttpResponseMessage> GetCircuitBreakerPolicy()
+        {
+            return HttpPolicyExtensions
+                .HandleTransientHttpError()
+                .CircuitBreakerAsync(
+                    handledEventsAllowedBeforeBreaking: 5,
+                    durationOfBreak: TimeSpan.FromSeconds(30));
         }
     }
 }
+

@@ -1,4 +1,4 @@
-﻿using Sentinel.Application.Abstractions;
+using Sentinel.Application.Abstractions;
 using Sentinel.Domain.Entities;
 using Sentinel.Infrastructure.Persistence.Context;
 using Sentinel.Infrastructure.Persistence.Repositories;
@@ -23,6 +23,7 @@ namespace Sentinel.Infrastructure.Persistence.UnitOfWork
             Vulnerabilities = new GenericRepository<Vulnerability>(_context);
             VexStatements = new GenericRepository<VexStatement>(_context);
             Licenses = new GenericRepository<License>(_context);
+            ComponentLicenses = new GenericRepository<ComponentLicense>(_context);
         }
 
         public IGenericRepository<Workspace> Workspaces { get; private set; }
@@ -32,6 +33,7 @@ namespace Sentinel.Infrastructure.Persistence.UnitOfWork
         public IGenericRepository<Vulnerability> Vulnerabilities { get; private set; }
         public IGenericRepository<VexStatement> VexStatements { get; private set; }
         public IGenericRepository<License> Licenses { get; private set; }
+        public IGenericRepository<ComponentLicense> ComponentLicenses { get; private set; }
 
         public async Task<int> SaveChangesAsync() => await _context.SaveChangesAsync();
 

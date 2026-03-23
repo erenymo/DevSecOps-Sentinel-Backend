@@ -25,6 +25,19 @@ namespace Sentinel.Infrastructure.Persistence.Context
         {
             base.OnModelCreating(modelBuilder);
 
+            modelBuilder.Entity<ComponentLicense>()
+            .HasKey(cl => new { cl.ComponentId, cl.LicenseId }); // Composite Key
+
+            modelBuilder.Entity<ComponentLicense>()
+                .HasOne(cl => cl.Component)
+                .WithMany(c => c.ComponentLicenses)
+                .HasForeignKey(cl => cl.ComponentId);
+
+            modelBuilder.Entity<ComponentLicense>()
+                .HasOne(cl => cl.License)
+                .WithMany(l => l.ComponentLicenses)
+                .HasForeignKey(cl => cl.LicenseId);
+
             // Workspace -> AppUser
             modelBuilder.Entity<Workspace>()
                 .HasOne<AppUser>()

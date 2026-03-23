@@ -14,16 +14,12 @@ namespace Sentinel.Application.Mapping
         public ComponentProfile()
         {
             CreateMap<Component, ComponentDto>()
-            // Id, Name, Version, Purl ve IsTransitive alanları 
-            // isimleri birebir aynı olduğu için otomatik eşleşir.
-
-            // License tablosundan Name bilgisini güvenli bir şekilde alıyoruz.
-            // Eğer License null ise "Unknown" veya "N/A" döner.
-            .ForMember(dest => dest.LicenseName,
-                opt => opt.MapFrom(src => src.License != null ? src.License.Name : "Unknown"));
-
-            // Entity'den DTO'ya dönüşüm (Okuma işlemleri için)
-            CreateMap<Component, ComponentDto>().ReverseMap();
+            // LicenseName (tekil) yerine LicenseNames (liste) eşlemesi yapıyoruz
+            .ForMember(dest => dest.LicenseNames,
+                opt => opt.MapFrom(src =>
+                    src.ComponentLicenses != null && src.ComponentLicenses.Any()
+                        ? src.ComponentLicenses.Select(cl => cl.License.Name).ToList()
+                        : new List<string> { "Unknown" }));
         }
     }
 }

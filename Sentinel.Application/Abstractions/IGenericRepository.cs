@@ -11,7 +11,7 @@ namespace Sentinel.Application.Abstractions
     {
         Task<T?> GetByIdAsync(Guid id);
         Task<IEnumerable<T>> GetAllAsync();
-        Task<IEnumerable<T>> GetAllAsync(Expression<Func<T, bool>> predicate);
+        Task<IEnumerable<T>> GetAllAsync(Expression<Func<T, bool>> predicate, string? includeProperties = null);
         IQueryable<T> Where(Expression<Func<T, bool>> predicate);
         Task AddAsync(T entity);
         void Update(T entity);

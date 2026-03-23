@@ -1,4 +1,4 @@
-﻿using Sentinel.Domain.Entities;
+using Sentinel.Domain.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,6 +16,7 @@ namespace Sentinel.Application.Abstractions
         IGenericRepository<Vulnerability> Vulnerabilities { get; }
         IGenericRepository<VexStatement> VexStatements { get; }
         IGenericRepository<License> Licenses { get; }
+        IGenericRepository<ComponentLicense> ComponentLicenses { get; }
 
         Task<int> SaveChangesAsync();
     }

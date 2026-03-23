@@ -13,11 +13,16 @@ namespace Sentinel.Application.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IEnumerable<IParserStrategy> _parsers;
+        private readonly ILicenseEnrichmentQueue _licenseQueue;
 
-        public ScannerService(IUnitOfWork unitOfWork, IEnumerable<IParserStrategy> parsers)
+        public ScannerService(
+            IUnitOfWork unitOfWork,
+            IEnumerable<IParserStrategy> parsers,
+            ILicenseEnrichmentQueue licenseQueue)
         {
             _unitOfWork = unitOfWork;
             _parsers = parsers;
+            _licenseQueue = licenseQueue;
         }
 
         public async Task<BaseResponse<Guid>> RunScanAsync(Guid moduleId, string fileName, string fileContent)
@@ -51,6 +56,9 @@ namespace Sentinel.Application.Services
 
                 await _unitOfWork.SaveChangesAsync();
 
+                // Tarama başarılı → Lisans zenginleştirme kuyruğuna ekle (fire-and-forget)
+                await _licenseQueue.EnqueueScanAsync(scan.Id);
+
                 return BaseResponse<Guid>.Ok(scan.Id, "Tarama başarıyla tamamlandı.");
             }
             catch (Exception ex)
@@ -61,3 +69,4 @@ namespace Sentinel.Application.Services
         }
     }
 }
+
