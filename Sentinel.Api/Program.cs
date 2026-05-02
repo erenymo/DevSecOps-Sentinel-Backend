@@ -8,6 +8,7 @@ using Sentinel.Application.Services;
 using Sentinel.Infrastructure;
 using Sentinel.Infrastructure.Persistence.Context;
 using Sentinel.Application.DTOs.Responses;
+using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers()
@@ -39,7 +40,16 @@ builder.Services.AddCors(options =>
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options =>
+{
+    // JWT Yetkilendirmesi eklemek istersen (DevSecOps odaðýna uygun olarak)
+    options.AddDocumentTransformer((document, context, cancellationToken) =>
+    {
+        document.Info.Title = "Sentinel API";
+        document.Info.Version = "v1";
+        return Task.CompletedTask;
+    });
+});
 builder.Services.AddDbContext<SentinelDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
@@ -58,7 +68,14 @@ app.UseAuthorization();
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.MapOpenApi(); // /openapi/v1.json dosyasýný üretir
+
+    app.UseSwaggerUI(options =>
+    {
+        // ÖNEMLÝ: Endpoint yolu MapOpenApi'nin ürettiði JSON ile ayný olmalý
+        options.SwaggerEndpoint("/openapi/v1.json", "Sentinel API v1");
+        options.RoutePrefix = "swagger";
+    });
 }
 
 app.UseHttpsRedirection();

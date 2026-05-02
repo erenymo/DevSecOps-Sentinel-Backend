@@ -32,7 +32,8 @@ namespace Sentinel.Application.Services
 
                 // 2. Bileşenleri çek
                 var components = await _unitOfWork.Components.GetAllAsync(
-                    c => c.ScanId == latestScan.Id
+                    c => c.ScanId == latestScan.Id,
+                    includeProperties: "VexStatements.Vulnerability"
                 );
 
                 var componentList = components.ToList();
@@ -64,7 +65,17 @@ namespace Sentinel.Application.Services
                     // PURL üzerinden lisans isimlerini alıyoruz
                     !string.IsNullOrWhiteSpace(c.Purl) && licenseMap.TryGetValue(c.Purl, out var licenses)
                         ? licenses
-                        : new List<string>()
+                        : new List<string>(),
+                    c.VexStatements?.Select(v => new ComponentVulnerabilityDto(
+                        v.Vulnerability.ExternalId,
+                        v.Vulnerability.VulnerabilityId,
+                        v.Vulnerability.SeverityType,
+                        v.Vulnerability.SeverityScore,
+                        v.Vulnerability.SeverityLevel,
+                        v.Status,
+                        v.CurrentVersion,
+                        v.FixedVersion
+                    )).ToList()
                 ));
 
                 return BaseResponse<IEnumerable<ComponentDto>>.Ok(dtos.ToList(), "Bileşenler başarıyla getirildi.");

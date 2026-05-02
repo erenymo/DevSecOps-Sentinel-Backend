@@ -105,6 +105,24 @@ namespace Sentinel.Application.Parsers
                 }
             }
 
+            // 1.5. ADIM: Root projenin doğrudan bağımlılıklarını (Direct Dependencies) oku
+            if (root.TryGetProperty("project", out var projectNode) &&
+                projectNode.TryGetProperty("frameworks", out var frameworksNode))
+            {
+                foreach (var framework in frameworksNode.EnumerateObject())
+                {
+                    if (framework.Value.TryGetProperty("dependencies", out var rootDeps))
+                    {
+                        foreach (var dep in rootDeps.EnumerateObject())
+                        {
+                            // Root projenin bizzat istediği paketleri Direct olarak işaretle
+                            directDependencies.Add(dep.Name);
+                            if (!parentMap.ContainsKey(dep.Name)) parentMap[dep.Name] = rootProjectName;
+                        }
+                    }
+                }
+            }
+
             // 2. ADIM: Dinamik Framework Taraması ve Parent/Direct Ayrımı
             if (root.TryGetProperty("targets", out var targets))
             {

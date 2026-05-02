@@ -14,15 +14,18 @@ namespace Sentinel.Application.Services
         private readonly IUnitOfWork _unitOfWork;
         private readonly IEnumerable<IParserStrategy> _parsers;
         private readonly ILicenseEnrichmentQueue _licenseQueue;
+        private readonly IVulnerabilityEnrichmentQueue _vulnQueue;
 
         public ScannerService(
             IUnitOfWork unitOfWork,
             IEnumerable<IParserStrategy> parsers,
-            ILicenseEnrichmentQueue licenseQueue)
+            ILicenseEnrichmentQueue licenseQueue,
+            IVulnerabilityEnrichmentQueue vulnQueue)
         {
             _unitOfWork = unitOfWork;
             _parsers = parsers;
             _licenseQueue = licenseQueue;
+            _vulnQueue = vulnQueue;
         }
 
         public async Task<BaseResponse<Guid>> RunScanAsync(Guid moduleId, string fileName, string fileContent)
@@ -56,8 +59,9 @@ namespace Sentinel.Application.Services
 
                 await _unitOfWork.SaveChangesAsync();
 
-                // Tarama başarılı → Lisans zenginleştirme kuyruğuna ekle (fire-and-forget)
+                // Tarama başarılı → Lisans ve Zafiyet zenginleştirme kuyruklarına ekle (fire-and-forget)
                 await _licenseQueue.EnqueueScanAsync(scan.Id);
+                await _vulnQueue.EnqueueScanAsync(scan.Id);
 
                 return BaseResponse<Guid>.Ok(scan.Id, "Tarama başarıyla tamamlandı.");
             }

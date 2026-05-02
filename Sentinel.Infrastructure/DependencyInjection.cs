@@ -112,6 +112,22 @@ namespace Sentinel.Infrastructure
             // Arka plan lisans zenginleştirme servisi
             services.AddHostedService<LicenseEnrichmentBackgroundService>();
 
+            // ─── OSV.dev Entegrasyonu ───────────────────────────────────────
+
+            services.AddSingleton<IVulnerabilityEnrichmentQueue, Sentinel.Infrastructure.Osv.VulnerabilityEnrichmentQueue>();
+
+            services.AddHttpClient<IOsvClient, Sentinel.Infrastructure.Osv.OsvClient>(client =>
+            {
+                client.BaseAddress = new Uri("https://api.osv.dev/");
+                client.DefaultRequestHeaders.Add("Accept", "application/json");
+                client.Timeout = TimeSpan.FromSeconds(30);
+            })
+            .AddPolicyHandler(GetRetryPolicy())
+            .AddPolicyHandler(GetCircuitBreakerPolicy());
+
+            // Arka plan zafiyet zenginleştirme servisi
+            services.AddHostedService<Sentinel.Infrastructure.Osv.VulnerabilityEnrichmentBackgroundService>();
+
             return services;
         }
 

@@ -24,14 +24,19 @@ namespace Sentinel.Application.Services
             if (workspace == null || workspace.OwnerId != ownerId)
                 return BaseResponse<List<ModuleResponse>>.Fail("Workspace not found");
 
-            var modules = await _unitOfWork.Modules.GetAllAsync(m => m.WorkspaceId == workspaceId);
-            var response = _mapper.Map<List<ModuleResponse>>(modules);
+            var modules = await _unitOfWork.Modules.GetAllAsync(m => m.WorkspaceId == workspaceId, includeProperties: "Scans.Components.VexStatements");
+            var response = modules.Select(m => {
+                var latestScan = m.Scans?.OrderByDescending(s => s.ScanDate).FirstOrDefault();
+                int depCount = latestScan?.Components?.Count ?? 0;
+                int vulnCount = latestScan?.Components?.SelectMany(c => c.VexStatements ?? new List<VexStatement>()).Count() ?? 0;
+                return new ModuleResponse(m.Id, m.Name, m.Ecosystem, m.RootPath, m.WorkspaceId, m.CreatedAt, depCount, vulnCount);
+            }).ToList();
             return BaseResponse<List<ModuleResponse>>.Ok(response);
         }
 
         public async Task<BaseResponse<ModuleResponse>> GetByIdAsync(Guid id, Guid ownerId)
         {
-            var module = await _unitOfWork.Modules.GetByIdAsync(id);
+            var module = (await _unitOfWork.Modules.GetAllAsync(m => m.Id == id, includeProperties: "Scans.Components.VexStatements")).FirstOrDefault();
             if (module == null)
                 return BaseResponse<ModuleResponse>.Fail("Module not found");
 
@@ -40,7 +45,11 @@ namespace Sentinel.Application.Services
             if (workspace == null || workspace.OwnerId != ownerId)
                 return BaseResponse<ModuleResponse>.Fail("Module not found");
 
-            return BaseResponse<ModuleResponse>.Ok(_mapper.Map<ModuleResponse>(module));
+            var latestScan = module.Scans?.OrderByDescending(s => s.ScanDate).FirstOrDefault();
+            int depCount = latestScan?.Components?.Count ?? 0;
+            int vulnCount = latestScan?.Components?.SelectMany(c => c.VexStatements ?? new List<VexStatement>()).Count() ?? 0;
+
+            return BaseResponse<ModuleResponse>.Ok(new ModuleResponse(module.Id, module.Name, module.Ecosystem, module.RootPath, module.WorkspaceId, module.CreatedAt, depCount, vulnCount));
         }
 
         public async Task<BaseResponse<Guid>> CreateAsync(Guid workspaceId, ModuleRequest request, Guid ownerId)
