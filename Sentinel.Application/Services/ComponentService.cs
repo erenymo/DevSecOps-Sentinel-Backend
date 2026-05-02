@@ -85,6 +85,33 @@ namespace Sentinel.Application.Services
                 return BaseResponse<IEnumerable<ComponentDto>>.Fail($"Hata oluştu: {ex.Message}");
             }
         }
+        public async Task<BaseResponse<bool>> UpdateVexStatusAsync(Guid componentId, string externalId, string status)
+        {
+            try
+            {
+                var allowedStatuses = new[] { "Not Affected", "Affected", "Under Investigation" };
+                if (!allowedStatuses.Contains(status))
+                    return BaseResponse<bool>.Fail("Geçersiz VEX statüsü.");
+
+                var vexStatements = await _unitOfWork.VexStatements.GetAllAsync(v => v.ComponentId == componentId, includeProperties: "Vulnerability");
+                var vex = vexStatements.FirstOrDefault(v => v.Vulnerability.ExternalId == externalId);
+
+                if (vex == null)
+                {
+                    return BaseResponse<bool>.Fail("VEX kaydı bulunamadı.");
+                }
+
+                vex.Status = status;
+                _unitOfWork.VexStatements.Update(vex);
+                await _unitOfWork.SaveChangesAsync();
+
+                return BaseResponse<bool>.Ok(true, "VEX statüsü güncellendi.");
+            }
+            catch (Exception ex)
+            {
+                return BaseResponse<bool>.Fail($"Hata oluştu: {ex.Message}");
+            }
+        }
     }
 }
 

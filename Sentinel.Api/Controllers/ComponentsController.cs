@@ -28,5 +28,15 @@ namespace Sentinel.Api.Controllers
             }
             return Ok(result);
         }
+        [HttpPut("vex-status")]
+        public async Task<IActionResult> UpdateVexStatus([FromBody] Sentinel.Application.DTOs.Requests.UpdateVexStatusRequest request)
+        {
+            var result = await _componentService.UpdateVexStatusAsync(request.ComponentId, request.ExternalId, request.Status);
+            if (!result.Success)
+            {
+                return BadRequest(result);
+            }
+            return Ok(result);
+        }
     }
 }

@@ -9,5 +9,6 @@ namespace Sentinel.Application.Abstractions
     public interface IComponentService
     {
         Task<BaseResponse<IEnumerable<ComponentDto>>> GetByModuleIdAsync(Guid moduleId);
+        Task<BaseResponse<bool>> UpdateVexStatusAsync(Guid componentId, string externalId, string status);
     }
 }
