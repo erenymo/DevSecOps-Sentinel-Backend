@@ -19,6 +19,8 @@ namespace Sentinel.Application.DTOs
 
     public record PackageLicenseInsightDto(
         string RiskExplanationForManagement,
+        string ProblematicUseCasesJson,
+        string SafeUseCasesJson,
         string RecommendedAlternativesJson
     );
 

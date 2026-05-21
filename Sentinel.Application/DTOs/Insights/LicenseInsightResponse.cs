@@ -12,6 +12,8 @@ namespace Sentinel.Application.DTOs.Insights
         public string PackageName { get; set; } = string.Empty;
         public string Purl { get; set; } = string.Empty;
         public string RiskExplanationForManagement { get; set; } = string.Empty;
+        public List<string> ProblematicUseCases { get; set; } = new();
+        public List<string> SafeUseCases { get; set; } = new();
         public List<AlternativePackage> RecommendedAlternatives { get; set; } = new();
     }
 

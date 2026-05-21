@@ -10,6 +10,8 @@ namespace Sentinel.Domain.Entities
     {
         public string Purl { get; set; } = string.Empty;
         public string RiskExplanationForManagement { get; set; } = string.Empty;
+        public string ProblematicUseCasesJson { get; set; } = string.Empty; // Store as JSON array
+        public string SafeUseCasesJson { get; set; } = string.Empty; // Store as JSON array
         public string RecommendedAlternativesJson { get; set; } = string.Empty; // Store alternatives as JSON array
     }
 }

@@ -25,9 +25,13 @@ namespace Sentinel.Infrastructure.Services
 
             var prompt = "You are a technical risk advisor. I will provide you with a list of open-source packages and their current problematic licenses. " +
                          "For each package, output a JSON object containing an 'Insights' array. Each item in the array must include 'PackageName', 'Purl', a 'RiskExplanationForManagement' " +
-                         "(explaining the risk of this license in business terms, easily understandable by managers, in Turkish language preferably or English if Turkish is not possible), " +
+                         "(explaining the risk of this license in business terms, easily understandable by managers), " +
+                         "'ProblematicUseCases' (an array of strings explaining under which conditions this license creates issues), " +
+                         "'SafeUseCases' (an array of strings explaining under which conditions this license is safe), " +
                          "and exactly 2 'RecommendedAlternatives' (popular alternatives licensed strictly under MIT or Apache). " +
-                         "The JSON schema must exactly match: { \"Insights\": [ { \"PackageName\": \"...\", \"Purl\": \"...\", \"RiskExplanationForManagement\": \"...\", \"RecommendedAlternatives\": [ { \"PackageName\": \"...\", \"LicenseType\": \"...\", \"ReasonForRecommendation\": \"...\" } ] } ] }";
+                         "For 'ReasonForRecommendation' in alternatives, emphasize what the package does, its functionality, and its advantages over the problematic one. " +
+                         "Write all content in English language strictly. " +
+                         "The JSON schema must exactly match: { \"Insights\": [ { \"PackageName\": \"...\", \"Purl\": \"...\", \"RiskExplanationForManagement\": \"...\", \"ProblematicUseCases\": [\"...\"], \"SafeUseCases\": [\"...\"], \"RecommendedAlternatives\": [ { \"PackageName\": \"...\", \"LicenseType\": \"...\", \"ReasonForRecommendation\": \"...\" } ] } ] }";
 
             var requestJson = JsonSerializer.Serialize(requests);
             

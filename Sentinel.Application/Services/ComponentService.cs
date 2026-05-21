@@ -58,7 +58,7 @@ namespace Sentinel.Application.Services
                     .ToDictionary(g => g.Key, g => g.Select(pl => pl.License.Name).ToList());
 
                 var insightMap = aiInsights
-                    .ToDictionary(i => i.Purl, i => new PackageLicenseInsightDto(i.RiskExplanationForManagement, i.RecommendedAlternativesJson));
+                    .ToDictionary(i => i.Purl, i => new PackageLicenseInsightDto(i.RiskExplanationForManagement, i.ProblematicUseCasesJson, i.SafeUseCasesJson, i.RecommendedAlternativesJson));
 
                 // 3. Yeni ComponentDto yapısına göre haritalama yap
                 var dtos = componentList.Select(c => new ComponentDto(

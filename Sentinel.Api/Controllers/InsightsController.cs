@@ -83,6 +83,8 @@ namespace Sentinel.Api.Controllers
                     {
                         Purl = insight.Purl,
                         RiskExplanationForManagement = insight.RiskExplanationForManagement,
+                        ProblematicUseCasesJson = JsonSerializer.Serialize(insight.ProblematicUseCases),
+                        SafeUseCasesJson = JsonSerializer.Serialize(insight.SafeUseCases),
                         RecommendedAlternativesJson = JsonSerializer.Serialize(insight.RecommendedAlternatives)
                     };
 
