@@ -120,89 +120,345 @@ namespace Sentinel.Application.Parsers
                 ? nameElement.GetString() ?? "UnknownProject"
                 : "UnknownProject";
 
-            // Doğrudan bağımlılık isimlerini topla (root "" entry'sinden)
-            var directDependencyNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            // Hangi paketi kimin getirdiğini tutan harita
-            var parentMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
             // lockfileVersion 2/3 → "packages" düğümünü kullan
             if (root.TryGetProperty("packages", out var packages))
             {
+                var directDependencyNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
                 // 1. ADIM: Root entry'den doğrudan bağımlılık isimlerini çıkar
                 if (packages.TryGetProperty("", out var rootEntry))
                 {
                     CollectDirectDependencyNames(rootEntry, directDependencyNames);
                 }
 
-                // 2. ADIM: Tüm node_modules entry'lerini tara
-                foreach (var pkg in packages.EnumerateObject())
+                var addedDirects = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var directName in directDependencyNames)
                 {
-                    var key = pkg.Name; // Örn: "node_modules/@tanstack/react-query"
-
-                    // Root entry ("") → atla, bu projenin kendisi
-                    if (string.IsNullOrEmpty(key))
-                        continue;
-
-                    // "node_modules/" prefix'ini kaldırarak paket adını çıkar
-                    var packageName = ExtractPackageNameFromKey(key);
-                    if (string.IsNullOrEmpty(packageName))
-                        continue;
-
-                    var version = pkg.Value.TryGetProperty("version", out var versionElement)
-                        ? versionElement.GetString() ?? "0.0.0"
-                        : "0.0.0";
-
-                    bool isDirect = directDependencyNames.Contains(packageName);
-
-                    // İç içe node_modules → parent tespiti
-                    // Örn: "node_modules/A/node_modules/B" → B'nin parent'ı A
-                    var parentName = ExtractParentFromKey(key);
-                    if (!string.IsNullOrEmpty(parentName))
+                    var directPath = $"node_modules/{directName}";
+                    if (packages.TryGetProperty(directPath, out var pkgElement))
                     {
-                        parentMap[packageName] = parentName;
+                        var version = pkgElement.TryGetProperty("version", out var v) ? v.GetString() ?? "0.0.0" : "0.0.0";
+                        var purl = BuildNpmPurl(directName, version);
+                        var dependencyPath = $"{projectName} -> {directName}";
+
+                        if (addedDirects.Add(directName))
+                        {
+                            components.Add(new Component
+                            {
+                                Id = Guid.NewGuid(),
+                                ScanId = scanId,
+                                Name = directName,
+                                Version = version,
+                                Purl = purl,
+                                IsTransitive = false,
+                                ParentName = null,
+                                DependencyPath = dependencyPath,
+                                CreatedAt = DateTime.UtcNow
+                            });
+                        }
+
+                        // Recursive resolve transitives
+                        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { directPath };
+                        var addedTransitivesForThisDirect = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                        ResolveDependenciesRecursive(
+                            packages,
+                            directPath,
+                            directName,
+                            directName,
+                            visited,
+                            addedTransitivesForThisDirect,
+                            components,
+                            scanId,
+                            projectName
+                        );
                     }
-                    else if (!isDirect)
-                    {
-                        // Alt dependencyler → bu paketi çağıran üst paketi bulmaya çalış
-                        // package-lock.json "packages" düğümünde doğrudan parent bilgisi yoktur,
-                        // bu yüzden iç içe path'e güveniyoruz.
-                    }
-
-                    // Dependency path oluştur
-                    string dependencyPath;
-                    if (isDirect)
-                    {
-                        dependencyPath = $"{projectName} -> {packageName}";
-                    }
-                    else
-                    {
-                        dependencyPath = BuildDependencyPath(packageName, parentMap, projectName);
-                    }
-
-                    var purl = BuildNpmPurl(packageName, version);
-
-                    components.Add(new Component
-                    {
-                        Id = Guid.NewGuid(),
-                        ScanId = scanId,
-                        Name = packageName,
-                        Version = version,
-                        Purl = purl,
-                        IsTransitive = !isDirect,
-                        ParentName = isDirect ? null : (parentMap.TryGetValue(packageName, out var parent) ? parent : null),
-                        DependencyPath = dependencyPath,
-                        CreatedAt = DateTime.UtcNow
-                    });
                 }
             }
             // lockfileVersion 1 fallback → eski "dependencies" düğümünü kullan
             else if (root.TryGetProperty("dependencies", out var depsNode))
             {
-                ParseLockfileV1Dependencies(depsNode, components, scanId, projectName, directDependencyNames, isTopLevel: true);
+                var addedDirects = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var dep in depsNode.EnumerateObject())
+                {
+                    var directName = dep.Name;
+                    var version = dep.Value.TryGetProperty("version", out var v) ? v.GetString() ?? "0.0.0" : "0.0.0";
+                    var purl = BuildNpmPurl(directName, version);
+                    var dependencyPath = $"{projectName} -> {directName}";
+
+                    if (addedDirects.Add(directName))
+                    {
+                        components.Add(new Component
+                        {
+                            Id = Guid.NewGuid(),
+                            ScanId = scanId,
+                            Name = directName,
+                            Version = version,
+                            Purl = purl,
+                            IsTransitive = false,
+                            ParentName = null,
+                            DependencyPath = dependencyPath,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                    }
+
+                    // Recursive resolve transitives for lockfile v1
+                    var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { directName };
+                    var addedTransitivesForThisDirect = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                    ResolveV1DependenciesRecursive(
+                        depsNode,
+                        directName,
+                        directName,
+                        directName,
+                        visited,
+                        addedTransitivesForThisDirect,
+                        components,
+                        scanId,
+                        projectName
+                    );
+                }
             }
 
             return components;
+        }
+
+        private void ResolveDependenciesRecursive(
+            JsonElement packages,
+            string currentPkgPath,
+            string directParentName,
+            string currentPkgName,
+            HashSet<string> visitedPaths,
+            HashSet<string> addedTransitivesForThisDirect,
+            List<Component> components,
+            Guid scanId,
+            string projectName)
+        {
+            if (!packages.TryGetProperty(currentPkgPath, out var pkgElement))
+                return;
+
+            if (pkgElement.TryGetProperty("dependencies", out var depsElement))
+            {
+                foreach (var dep in depsElement.EnumerateObject())
+                {
+                    var depName = dep.Name;
+
+                    var resolvedPath = ResolvePackagePath(packages, currentPkgPath, depName);
+                    if (string.IsNullOrEmpty(resolvedPath))
+                    {
+                        resolvedPath = $"node_modules/{depName}";
+                        if (!packages.TryGetProperty(resolvedPath, out _))
+                        {
+                            continue;
+                        }
+                    }
+
+                    if (visitedPaths.Contains(resolvedPath))
+                        continue;
+
+                    if (packages.TryGetProperty(resolvedPath, out var depPkgElement))
+                    {
+                        var version = depPkgElement.TryGetProperty("version", out var v) ? v.GetString() ?? "0.0.0" : "0.0.0";
+                        var purl = BuildNpmPurl(depName, version);
+                        var dependencyPath = $"{projectName} -> {directParentName} -> ... -> {depName}";
+
+                        if (addedTransitivesForThisDirect.Add(depName))
+                        {
+                            components.Add(new Component
+                            {
+                                Id = Guid.NewGuid(),
+                                ScanId = scanId,
+                                Name = depName,
+                                Version = version,
+                                Purl = purl,
+                                IsTransitive = true,
+                                ParentName = directParentName,
+                                DependencyPath = dependencyPath,
+                                CreatedAt = DateTime.UtcNow
+                            });
+                        }
+
+                        var nextVisited = new HashSet<string>(visitedPaths, StringComparer.OrdinalIgnoreCase) { resolvedPath };
+                        ResolveDependenciesRecursive(
+                            packages,
+                            resolvedPath,
+                            directParentName,
+                            depName,
+                            nextVisited,
+                            addedTransitivesForThisDirect,
+                            components,
+                            scanId,
+                            projectName
+                        );
+                    }
+                }
+            }
+        }
+
+        private string? ResolvePackagePath(JsonElement packages, string currentPkgPath, string depName)
+        {
+            if (string.IsNullOrEmpty(currentPkgPath))
+            {
+                var rootPath = $"node_modules/{depName}";
+                if (packages.TryGetProperty(rootPath, out _))
+                    return rootPath;
+                return null;
+            }
+
+            var parts = currentPkgPath.Split(new[] { "node_modules/" }, StringSplitOptions.RemoveEmptyEntries)
+                                      .Select(p => p.TrimEnd('/')).ToList();
+
+            for (int i = parts.Count; i >= 0; i--)
+            {
+                var subParts = parts.Take(i);
+                var pathBuilder = new StringBuilder();
+                foreach (var part in subParts)
+                {
+                    pathBuilder.Append("node_modules/");
+                    pathBuilder.Append(part);
+                    pathBuilder.Append("/");
+                }
+                pathBuilder.Append("node_modules/");
+                pathBuilder.Append(depName);
+
+                var candidatePath = pathBuilder.ToString();
+                if (packages.TryGetProperty(candidatePath, out _))
+                {
+                    return candidatePath;
+                }
+            }
+
+            return null;
+        }
+
+        private void ResolveV1DependenciesRecursive(
+            JsonElement rootDeps,
+            string currentPkgPath,
+            string directParentName,
+            string currentPkgName,
+            HashSet<string> visitedPaths,
+            HashSet<string> addedTransitivesForThisDirect,
+            List<Component> components,
+            Guid scanId,
+            string projectName)
+        {
+            var pkgElement = GetV1PackageAtPath(rootDeps, currentPkgPath);
+            if (pkgElement == null || !pkgElement.Value.TryGetProperty("requires", out var requiresElement))
+                return;
+
+            foreach (var req in requiresElement.EnumerateObject())
+            {
+                var depName = req.Name;
+
+                var resolvedPath = ResolveV1PackagePath(rootDeps, currentPkgPath, depName);
+                if (string.IsNullOrEmpty(resolvedPath))
+                {
+                    resolvedPath = depName;
+                }
+
+                if (visitedPaths.Contains(resolvedPath))
+                    continue;
+
+                var depPkgElement = GetV1PackageAtPath(rootDeps, resolvedPath);
+                if (depPkgElement != null)
+                {
+                    var version = depPkgElement.Value.TryGetProperty("version", out var v) ? v.GetString() ?? "0.0.0" : "0.0.0";
+                    var purl = BuildNpmPurl(depName, version);
+                    var dependencyPath = $"{projectName} -> {directParentName} -> ... -> {depName}";
+
+                    if (addedTransitivesForThisDirect.Add(depName))
+                    {
+                        components.Add(new Component
+                        {
+                            Id = Guid.NewGuid(),
+                            ScanId = scanId,
+                            Name = depName,
+                            Version = version,
+                            Purl = purl,
+                            IsTransitive = true,
+                            ParentName = directParentName,
+                            DependencyPath = dependencyPath,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                    }
+
+                    var nextVisited = new HashSet<string>(visitedPaths, StringComparer.OrdinalIgnoreCase) { resolvedPath };
+                    ResolveV1DependenciesRecursive(
+                        rootDeps,
+                        resolvedPath,
+                        directParentName,
+                        depName,
+                        nextVisited,
+                        addedTransitivesForThisDirect,
+                        components,
+                        scanId,
+                        projectName
+                    );
+                }
+            }
+        }
+
+        private string? ResolveV1PackagePath(JsonElement rootDeps, string currentPkgPath, string depName)
+        {
+            if (string.IsNullOrEmpty(currentPkgPath))
+            {
+                if (rootDeps.TryGetProperty(depName, out _))
+                    return depName;
+                return null;
+            }
+
+            var parts = currentPkgPath.Split('/').ToList();
+
+            for (int i = parts.Count; i >= 0; i--)
+            {
+                var prefixParts = parts.Take(i).ToList();
+                prefixParts.Add(depName);
+                var candidatePath = string.Join("/", prefixParts);
+
+                if (GetV1PackageAtPath(rootDeps, candidatePath) != null)
+                {
+                    return candidatePath;
+                }
+            }
+
+            return null;
+        }
+
+        private JsonElement? GetV1PackageAtPath(JsonElement rootDeps, string path)
+        {
+            if (string.IsNullOrEmpty(path))
+                return null;
+
+            var parts = path.Split('/');
+            var currentElement = rootDeps;
+
+            for (int i = 0; i < parts.Length; i++)
+            {
+                if (i > 0)
+                {
+                    if (currentElement.TryGetProperty("dependencies", out var subDeps))
+                    {
+                        currentElement = subDeps;
+                    }
+                    else
+                    {
+                        return null;
+                    }
+                }
+
+                if (currentElement.TryGetProperty(parts[i], out var next))
+                {
+                    currentElement = next;
+                }
+                else
+                {
+                    return null;
+                }
+            }
+
+            return currentElement;
         }
 
         /// <summary>
@@ -220,105 +476,6 @@ namespace Sentinel.Application.Parsers
             {
                 foreach (var dep in devDeps.EnumerateObject())
                     directNames.Add(dep.Name);
-            }
-        }
-
-        /// <summary>
-        /// "node_modules/..." key'inden paket adını çıkarır.
-        /// Scoped paketleri de destekler: "node_modules/@scope/name" → "@scope/name"
-        /// İç içe paketler: "node_modules/A/node_modules/B" → "B"
-        /// </summary>
-        private string ExtractPackageNameFromKey(string key)
-        {
-            // Son "node_modules/" segmentinden sonrasını al
-            const string nodeModulesPrefix = "node_modules/";
-            var lastIndex = key.LastIndexOf(nodeModulesPrefix, StringComparison.Ordinal);
-
-            if (lastIndex < 0)
-                return key;
-
-            var afterPrefix = key.Substring(lastIndex + nodeModulesPrefix.Length);
-
-            // Scoped paketler: @scope/name → sonraki "/" olup olmadığını kontrol et
-            if (afterPrefix.StartsWith("@"))
-            {
-                // @scope/name → tamamı paket adı (sonraki node_modules'a kadar)
-                return afterPrefix;
-            }
-
-            return afterPrefix;
-        }
-
-        /// <summary>
-        /// İç içe node_modules yollarından parent paket adını çıkarır.
-        /// Örn: "node_modules/A/node_modules/B" → A
-        /// Örn: "node_modules/A" → null (root level, parent yok)
-        /// </summary>
-        private string? ExtractParentFromKey(string key)
-        {
-            const string nodeModulesPrefix = "node_modules/";
-
-            // Kaç "node_modules/" segmenti var?
-            var segments = key.Split(new[] { nodeModulesPrefix }, StringSplitOptions.RemoveEmptyEntries);
-
-            if (segments.Length < 2)
-                return null;
-
-            // Sondan bir önceki segment → parent
-            var parentSegment = segments[segments.Length - 2];
-
-            // Trailing "/" varsa temizle
-            return parentSegment.TrimEnd('/');
-        }
-
-        /// <summary>
-        /// lockfileVersion 1 için eski "dependencies" düğümünü recursive olarak parse eder.
-        /// Her dependency'nin kendi "dependencies" alt düğümü olabilir (transitive).
-        /// </summary>
-        private void ParseLockfileV1Dependencies(
-            JsonElement depsNode,
-            List<Component> components,
-            Guid scanId,
-            string projectName,
-            HashSet<string> directNames,
-            bool isTopLevel,
-            string? parentPackageName = null)
-        {
-            foreach (var dep in depsNode.EnumerateObject())
-            {
-                var name = dep.Name;
-                var version = dep.Value.TryGetProperty("version", out var versionElement)
-                    ? versionElement.GetString() ?? "0.0.0"
-                    : "0.0.0";
-
-                bool isDirect = isTopLevel;
-
-                if (isTopLevel)
-                    directNames.Add(name);
-
-                var purl = BuildNpmPurl(name, version);
-                var dependencyPath = isDirect
-                    ? $"{projectName} -> {name}"
-                    : $"{projectName} -> ... -> {parentPackageName} -> {name}";
-
-                components.Add(new Component
-                {
-                    Id = Guid.NewGuid(),
-                    ScanId = scanId,
-                    Name = name,
-                    Version = version,
-                    Purl = purl,
-                    IsTransitive = !isDirect,
-                    ParentName = isDirect ? null : parentPackageName,
-                    DependencyPath = dependencyPath,
-                    CreatedAt = DateTime.UtcNow
-                });
-
-                // Recursive: Alt bağımlılıklar (transitive)
-                if (dep.Value.TryGetProperty("dependencies", out var subDeps))
-                {
-                    ParseLockfileV1Dependencies(subDeps, components, scanId, projectName, directNames, isTopLevel: false, parentPackageName: name);
-                }
             }
         }
 

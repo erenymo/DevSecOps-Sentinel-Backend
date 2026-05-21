@@ -53,7 +53,10 @@ namespace Sentinel.Infrastructure.DepsDev
             {
                 // 3. deps.dev API v3 çağrısı
                 // Endpoint: GET /v3/systems/{system}/packages/{package}/versions/{version}
-                var encodedPackage = Uri.EscapeDataString(packageName);
+                var cleanPackageName = packageName.Replace("%40", "@");
+                var encodedPackage = Uri.EscapeDataString(cleanPackageName)
+                                        .Replace("@", "%40")
+                                        .Replace("/", "%2F");
                 var encodedVersion = Uri.EscapeDataString(version);
                 var requestUri = $"v3/systems/{system}/packages/{encodedPackage}/versions/{encodedVersion}";
 
