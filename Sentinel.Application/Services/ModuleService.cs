@@ -17,6 +17,56 @@ namespace Sentinel.Application.Services
             _mapper = mapper;
         }
 
+        private static (double? ThreatScore, double? LicenseScore) CalculateScores(
+            Scan? latestScan, 
+            HashSet<string> riskPurls, 
+            IEnumerable<PackageLicense> riskPackageLicenses)
+        {
+            double? threatScore = null;
+            if (latestScan?.Components != null && latestScan.Components.Any())
+            {
+                var allVulnerabilities = latestScan.Components
+                    .SelectMany(c => c.VexStatements ?? new List<VexStatement>())
+                    .Where(v => v.Vulnerability != null)
+                    .Select(v => v.Vulnerability)
+                    .ToList();
+
+                if (allVulnerabilities.Any())
+                {
+                    var maxScore = allVulnerabilities.Max(v => (double)(v.SeverityScore ?? 0));
+                    threatScore = Math.Round(maxScore, 1);
+                }
+            }
+
+            double? licenseScore = null;
+            if (latestScan?.Components != null && latestScan.Components.Any())
+            {
+                double score = 100.0;
+                var componentsWithLicenses = latestScan.Components
+                    .Where(c => !string.IsNullOrWhiteSpace(c.Purl))
+                    .ToList();
+
+                if (componentsWithLicenses.Any())
+                {
+                    foreach (var comp in componentsWithLicenses)
+                    {
+                        var matches = riskPackageLicenses.Where(pl => pl.Purl == comp.Purl).ToList();
+                        if (matches.Any())
+                        {
+                            bool isHighRisk = matches.Any(pl => pl.License.RiskLevel == "High");
+                            bool isMediumRisk = matches.Any(pl => pl.License.RiskLevel == "Medium");
+                            double penalty = isHighRisk ? 25.0 : (isMediumRisk ? 10.0 : 0.0);
+                            double weight = comp.IsTransitive ? 0.5 : 1.0;
+                            score -= (penalty * weight);
+                        }
+                    }
+                    licenseScore = Math.Max(0.0, Math.Min(100.0, Math.Round(score)));
+                }
+            }
+
+            return (threatScore, licenseScore);
+        }
+
         public async Task<BaseResponse<List<ModuleResponse>>> GetByWorkspaceAsync(Guid workspaceId, Guid ownerId)
         {
             // Verify workspace ownership
@@ -24,7 +74,7 @@ namespace Sentinel.Application.Services
             if (workspace == null || workspace.OwnerId != ownerId)
                 return BaseResponse<List<ModuleResponse>>.Fail("Workspace not found");
 
-            var modules = await _unitOfWork.Modules.GetAllAsync(m => m.WorkspaceId == workspaceId, includeProperties: "Scans.Components.VexStatements");
+            var modules = await _unitOfWork.Modules.GetAllAsync(m => m.WorkspaceId == workspaceId, includeProperties: "Scans.Components.VexStatements.Vulnerability");
             
             // Collect all unique PURLs across all modules' latest scans to query licenses efficiently in one round-trip
             var allLatestPurls = modules
@@ -54,7 +104,9 @@ namespace Sentinel.Application.Services
                     .Distinct()
                     .Count() ?? 0;
 
-                return new ModuleResponse(m.Id, m.Name, m.Ecosystem, m.RootPath, m.WorkspaceId, m.CreatedAt, depCount, vulnCount, latestScan?.ScanDate, licenseIssueCount);
+                var (threatScore, licenseScore) = CalculateScores(latestScan, riskPurls, riskPackageLicenses);
+
+                return new ModuleResponse(m.Id, m.Name, m.Ecosystem, m.RootPath, m.WorkspaceId, m.CreatedAt, depCount, vulnCount, latestScan?.ScanDate, licenseIssueCount, threatScore, licenseScore);
             }).ToList();
 
             return BaseResponse<List<ModuleResponse>>.Ok(response);
@@ -62,7 +114,7 @@ namespace Sentinel.Application.Services
 
         public async Task<BaseResponse<ModuleResponse>> GetByIdAsync(Guid id, Guid ownerId)
         {
-            var module = (await _unitOfWork.Modules.GetAllAsync(m => m.Id == id, includeProperties: "Scans.Components.VexStatements")).FirstOrDefault();
+            var module = (await _unitOfWork.Modules.GetAllAsync(m => m.Id == id, includeProperties: "Scans.Components.VexStatements.Vulnerability")).FirstOrDefault();
             if (module == null)
                 return BaseResponse<ModuleResponse>.Fail("Module not found");
 
@@ -76,6 +128,9 @@ namespace Sentinel.Application.Services
             int vulnCount = latestScan?.Components?.SelectMany(c => c.VexStatements ?? new List<VexStatement>()).Count() ?? 0;
 
             int licenseIssueCount = 0;
+            double? threatScore = null;
+            double? licenseScore = null;
+
             if (latestScan?.Components != null)
             {
                 var purls = latestScan.Components
@@ -96,9 +151,13 @@ namespace Sentinel.Application.Services
                     .Select(c => c.Purl!)
                     .Distinct()
                     .Count();
+
+                var scores = CalculateScores(latestScan, riskPurls, riskPackageLicenses);
+                threatScore = scores.ThreatScore;
+                licenseScore = scores.LicenseScore;
             }
 
-            return BaseResponse<ModuleResponse>.Ok(new ModuleResponse(module.Id, module.Name, module.Ecosystem, module.RootPath, module.WorkspaceId, module.CreatedAt, depCount, vulnCount, latestScan?.ScanDate, licenseIssueCount));
+            return BaseResponse<ModuleResponse>.Ok(new ModuleResponse(module.Id, module.Name, module.Ecosystem, module.RootPath, module.WorkspaceId, module.CreatedAt, depCount, vulnCount, latestScan?.ScanDate, licenseIssueCount, threatScore, licenseScore));
         }
 
         public async Task<BaseResponse<Guid>> CreateAsync(Guid workspaceId, ModuleRequest request, Guid ownerId)

@@ -23,6 +23,7 @@ namespace Sentinel.Infrastructure.Persistence.Context
 
         public DbSet<PackageLicense> PackageLicenses => Set<PackageLicense>();
         public DbSet<PackageLicenseInsight> PackageLicenseInsights => Set<PackageLicenseInsight>();
+        public DbSet<AlternativePackageCache> AlternativePackageCaches => Set<AlternativePackageCache>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -76,6 +77,13 @@ namespace Sentinel.Infrastructure.Persistence.Context
             // Indexing for high-performance lookups
             modelBuilder.Entity<Component>().HasIndex(c => c.Purl);
             modelBuilder.Entity<Vulnerability>().HasIndex(v => v.ExternalId).IsUnique();
+
+            // AlternativePackageCache — PackageName string primary key
+            modelBuilder.Entity<AlternativePackageCache>()
+                .HasKey(a => a.PackageName);
+            modelBuilder.Entity<AlternativePackageCache>()
+                .Property(a => a.PackageName)
+                .HasMaxLength(256);
         }
     }
 }
