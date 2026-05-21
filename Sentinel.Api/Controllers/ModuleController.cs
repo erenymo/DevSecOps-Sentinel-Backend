@@ -12,13 +12,33 @@ namespace Sentinel.Api.Controllers
     public class ModuleController : ControllerBase
     {
         private readonly IModuleService _moduleService;
+        private readonly ISbomExportService _sbomExportService;
 
-        public ModuleController(IModuleService moduleService)
+        public ModuleController(IModuleService moduleService, ISbomExportService sbomExportService)
         {
             _moduleService = moduleService;
+            _sbomExportService = sbomExportService;
         }
 
         private Guid UserId => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        [HttpGet("{id}/export-sbom")]
+        public async Task<IActionResult> ExportSbom(Guid id)
+        {
+            var result = await _sbomExportService.ExportSbomJsonAsync(id, UserId);
+            if (!result.Success) return BadRequest(result);
+
+            var moduleResult = await _moduleService.GetByIdAsync(id, UserId);
+            var rawModuleName = (moduleResult.Success && moduleResult.Data != null) ? (moduleResult.Data.Name ?? "module") : "module";
+            // Sanitize module name for filename
+            var moduleName = string.Join("_", rawModuleName.Split(Path.GetInvalidFileNameChars()));
+            
+            var dateStr = DateTime.UtcNow.ToString("yyyy-MM-dd");
+            var fileName = $"{moduleName}-sbom-{dateStr}.json";
+
+            var bytes = System.Text.Encoding.UTF8.GetBytes(result.Data ?? "{}");
+            return File(bytes, "application/json", fileName);
+        }
 
         [HttpGet("getByWorkspace/{workspaceId}")]
         public async Task<IActionResult> GetByWorkspace(Guid workspaceId)
