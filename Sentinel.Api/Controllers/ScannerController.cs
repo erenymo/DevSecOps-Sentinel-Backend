@@ -39,5 +39,12 @@ namespace Sentinel.Api.Controllers
 
             return Ok(result);
         }
+
+        [HttpGet("status/{moduleId}")]
+        public async Task<IActionResult> GetScanStatus(Guid moduleId)
+        {
+            var result = await _scannerService.GetScanStatusAsync(moduleId);
+            return Ok(result);
+        }
     }
 }

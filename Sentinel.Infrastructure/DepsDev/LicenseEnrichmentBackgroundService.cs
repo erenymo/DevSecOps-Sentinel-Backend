@@ -179,7 +179,15 @@ namespace Sentinel.Infrastructure.DepsDev
                     result.Purl, string.Join(", ", result.LicenseNames));
             }
 
-            // 6. Tüm değişiklikleri tek seferde kaydet
+            // 6. Tarama durumunu güncelle
+            var scan = await unitOfWork.Scans.GetByIdAsync(scanId);
+            if (scan != null)
+            {
+                scan.LicenseEnrichmentCompleted = true;
+                unitOfWork.Scans.Update(scan);
+            }
+
+            // 7. Tüm değişiklikleri tek seferde kaydet
             await unitOfWork.SaveChangesAsync();
         }
 

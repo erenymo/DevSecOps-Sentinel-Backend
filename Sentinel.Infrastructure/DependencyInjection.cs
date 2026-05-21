@@ -134,7 +134,8 @@ namespace Sentinel.Infrastructure
             services.Configure<Sentinel.Infrastructure.Configuration.OpenAISettings>(
                 configuration.GetSection("OpenAI"));
 
-            services.AddHostedService<Sentinel.Infrastructure.Insights.AILicenseInsightBackgroundService>();
+            // Background service is disabled; triggered manually via API now.
+            // services.AddHostedService<Sentinel.Infrastructure.Insights.AILicenseInsightBackgroundService>();
 
             return services;
         }

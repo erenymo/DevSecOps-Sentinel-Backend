@@ -59,9 +59,20 @@ namespace Sentinel.Application.Services
 
                 await _unitOfWork.SaveChangesAsync();
 
-                // Tarama başarılı → Lisans ve Zafiyet zenginleştirme kuyruklarına ekle (fire-and-forget)
-                await _licenseQueue.EnqueueScanAsync(scan.Id);
-                await _vulnQueue.EnqueueScanAsync(scan.Id);
+                if (components.Count > 0)
+                {
+                    // Tarama başarılı ve bileşen bulundu → Kuyruklara ekle
+                    await _licenseQueue.EnqueueScanAsync(scan.Id);
+                    await _vulnQueue.EnqueueScanAsync(scan.Id);
+                }
+                else
+                {
+                    // Bağımlılık bulunamadı → Yükleme bitti say ve kuyrukları atla
+                    scan.VulnEnrichmentCompleted = true;
+                    scan.LicenseEnrichmentCompleted = true;
+                    _unitOfWork.Scans.Update(scan);
+                    await _unitOfWork.SaveChangesAsync();
+                }
 
                 return BaseResponse<Guid>.Ok(scan.Id, "Tarama başarıyla tamamlandı.");
             }
@@ -69,7 +80,29 @@ namespace Sentinel.Application.Services
             {
                 return BaseResponse<Guid>.Fail($"Tarama sırasında hata oluştu: {ex.Message}");
             }
+        }
 
+        public async Task<BaseResponse<ScanStatusDto>> GetScanStatusAsync(Guid moduleId)
+        {
+            var scans = await _unitOfWork.Scans.GetAllAsync(s => s.ModuleId == moduleId);
+            var latestScan = scans.OrderByDescending(s => s.ScanDate).FirstOrDefault();
+
+            if (latestScan == null)
+            {
+                return BaseResponse<ScanStatusDto>.Ok(new ScanStatusDto
+                {
+                    IsDependenciesParsed = false,
+                    IsVulnEnrichmentCompleted = false,
+                    IsLicenseEnrichmentCompleted = false
+                }, "No scan found");
+            }
+
+            return BaseResponse<ScanStatusDto>.Ok(new ScanStatusDto
+            {
+                IsDependenciesParsed = true, // Dependencies parsing is synchronous during upload
+                IsVulnEnrichmentCompleted = latestScan.VulnEnrichmentCompleted,
+                IsLicenseEnrichmentCompleted = latestScan.LicenseEnrichmentCompleted
+            }, "Status fetched");
         }
     }
 }
