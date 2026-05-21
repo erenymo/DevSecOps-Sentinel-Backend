@@ -10,6 +10,7 @@ using Sentinel.Infrastructure.DepsDev;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using Sentinel.Application.Common.Interfaces;
 using Sentinel.Infrastructure.Persistence.Repositories;
 using Sentinel.Infrastructure.Persistence.UnitOfWork;
 using Polly;
@@ -127,6 +128,13 @@ namespace Sentinel.Infrastructure
 
             // Arka plan zafiyet zenginleştirme servisi
             services.AddHostedService<Sentinel.Infrastructure.Osv.VulnerabilityEnrichmentBackgroundService>();
+
+            // ─── AI License Insights ──────────────────────────────────────────
+
+            services.Configure<Sentinel.Infrastructure.Configuration.OpenAISettings>(
+                configuration.GetSection("OpenAI"));
+
+            services.AddHostedService<Sentinel.Infrastructure.Insights.AILicenseInsightBackgroundService>();
 
             return services;
         }

@@ -22,6 +22,7 @@ namespace Sentinel.Infrastructure.Persistence.Context
         public DbSet<VexStatement> VexStatements => Set<VexStatement>();
 
         public DbSet<PackageLicense> PackageLicenses => Set<PackageLicense>();
+        public DbSet<PackageLicenseInsight> PackageLicenseInsights => Set<PackageLicenseInsight>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

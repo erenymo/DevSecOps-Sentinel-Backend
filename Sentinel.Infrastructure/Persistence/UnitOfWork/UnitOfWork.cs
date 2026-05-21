@@ -24,6 +24,7 @@ namespace Sentinel.Infrastructure.Persistence.UnitOfWork
             VexStatements = new GenericRepository<VexStatement>(_context);
             Licenses = new GenericRepository<License>(_context);
             PackageLicenses = new GenericRepository<PackageLicense>(_context);
+            PackageLicenseInsights = new GenericRepository<PackageLicenseInsight>(_context);
         }
 
         public IGenericRepository<Workspace> Workspaces { get; private set; }
@@ -34,6 +35,7 @@ namespace Sentinel.Infrastructure.Persistence.UnitOfWork
         public IGenericRepository<VexStatement> VexStatements { get; private set; }
         public IGenericRepository<License> Licenses { get; private set; }
         public IGenericRepository<PackageLicense> PackageLicenses { get; private set; }
+        public IGenericRepository<PackageLicenseInsight> PackageLicenseInsights { get; private set; }
 
         public async Task<int> SaveChangesAsync() => await _context.SaveChangesAsync();
 

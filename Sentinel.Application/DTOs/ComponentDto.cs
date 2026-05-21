@@ -17,6 +17,11 @@ namespace Sentinel.Application.DTOs
         string? FixedVersion
     );
 
+    public record PackageLicenseInsightDto(
+        string RiskExplanationForManagement,
+        string RecommendedAlternativesJson
+    );
+
     public record ComponentDto(
         Guid Id, 
         string Name, 
@@ -26,6 +31,7 @@ namespace Sentinel.Application.DTOs
         string? ParentName, 
         string? DependencyPath, 
         List<string>? LicenseNames,
-        List<ComponentVulnerabilityDto>? Vulnerabilities = null
+        List<ComponentVulnerabilityDto>? Vulnerabilities = null,
+        PackageLicenseInsightDto? AiInsight = null
     );
 }

@@ -49,9 +49,16 @@ namespace Sentinel.Application.Services
                     includeProperties: "License"
                 );
 
+                var aiInsights = await _unitOfWork.PackageLicenseInsights.GetAllAsync(
+                    pl => purls.Contains(pl.Purl)
+                );
+
                 var licenseMap = packageLicenses
                     .GroupBy(pl => pl.Purl)
                     .ToDictionary(g => g.Key, g => g.Select(pl => pl.License.Name).ToList());
+
+                var insightMap = aiInsights
+                    .ToDictionary(i => i.Purl, i => new PackageLicenseInsightDto(i.RiskExplanationForManagement, i.RecommendedAlternativesJson));
 
                 // 3. Yeni ComponentDto yapısına göre haritalama yap
                 var dtos = componentList.Select(c => new ComponentDto(
@@ -75,7 +82,10 @@ namespace Sentinel.Application.Services
                         v.Status,
                         v.CurrentVersion,
                         v.FixedVersion
-                    )).ToList()
+                    )).ToList(),
+                    !string.IsNullOrWhiteSpace(c.Purl) && insightMap.TryGetValue(c.Purl, out var insight)
+                        ? insight
+                        : null
                 ));
 
                 return BaseResponse<IEnumerable<ComponentDto>>.Ok(dtos.ToList(), "Bileşenler başarıyla getirildi.");

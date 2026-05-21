@@ -17,6 +17,7 @@ namespace Sentinel.Application.Abstractions
         IGenericRepository<VexStatement> VexStatements { get; }
         IGenericRepository<License> Licenses { get; }
         IGenericRepository<PackageLicense> PackageLicenses { get; }
+        IGenericRepository<PackageLicenseInsight> PackageLicenseInsights { get; }
 
         Task<int> SaveChangesAsync();
     }
