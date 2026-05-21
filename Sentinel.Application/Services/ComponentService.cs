@@ -103,16 +103,34 @@ namespace Sentinel.Application.Services
                 if (!allowedStatuses.Contains(status))
                     return BaseResponse<bool>.Fail("Geçersiz VEX statüsü.");
 
-                var vexStatements = await _unitOfWork.VexStatements.GetAllAsync(v => v.ComponentId == componentId, includeProperties: "Vulnerability");
-                var vex = vexStatements.FirstOrDefault(v => v.Vulnerability.ExternalId == externalId);
+                var targetComponent = await _unitOfWork.Components.GetByIdAsync(componentId);
+                if (targetComponent == null)
+                    return BaseResponse<bool>.Fail("Bileşen bulunamadı.");
 
-                if (vex == null)
+                var siblingComponents = await _unitOfWork.Components.GetAllAsync(c => 
+                    c.ScanId == targetComponent.ScanId && 
+                    c.Name == targetComponent.Name && 
+                    c.Version == targetComponent.Version);
+
+                var siblingComponentIds = siblingComponents.Select(c => c.Id).ToList();
+
+                var vexStatements = await _unitOfWork.VexStatements.GetAllAsync(v => 
+                    siblingComponentIds.Contains(v.ComponentId), 
+                    includeProperties: "Vulnerability");
+
+                var vexesToUpdate = vexStatements.Where(v => v.Vulnerability.ExternalId == externalId).ToList();
+
+                if (!vexesToUpdate.Any())
                 {
                     return BaseResponse<bool>.Fail("VEX kaydı bulunamadı.");
                 }
 
-                vex.Status = status;
-                _unitOfWork.VexStatements.Update(vex);
+                foreach (var vex in vexesToUpdate)
+                {
+                    vex.Status = status;
+                    _unitOfWork.VexStatements.Update(vex);
+                }
+
                 await _unitOfWork.SaveChangesAsync();
 
                 return BaseResponse<bool>.Ok(true, "VEX statüsü güncellendi.");
